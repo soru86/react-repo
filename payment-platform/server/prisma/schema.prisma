@@ -1,0 +1,94 @@
+// datasource and generator
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note: SQLite doesn't support enums, so we use String types instead
+// Valid values are enforced at the application level
+
+// models
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("MERCHANT") // "PROVIDER" | "MERCHANT" | "ADMIN"
+  createdAt    DateTime @default(now())
+  accounts     Account[]
+}
+
+model Account {
+  id                  String          @id @default(uuid())
+  name                String
+  ownerId             String
+  owner               User            @relation(fields: [ownerId], references: [id])
+  createdAt           DateTime        @default(now())
+  providerCollaborations Collaboration[] @relation("providerCollab")
+  merchantCollaborations Collaboration[] @relation("merchantCollab")
+  payouts             Payout[]
+  // balances could be tracked per currency separately in a real system
+}
+
+model Collaboration {
+  id                 String   @id @default(uuid())
+  name               String
+  description        String?
+  providerAccountId  String
+  merchantAccountId  String
+  providerAccount    Account  @relation("providerCollab", fields: [providerAccountId], references: [id])
+  merchantAccount    Account  @relation("merchantCollab", fields: [merchantAccountId], references: [id])
+  createdAt          DateTime @default(now())
+  quotas             Quota[]
+  payments           Payment[]
+}
+
+model Quota {
+  id                String    @id @default(uuid())
+  collaborationId   String
+  collaboration     Collaboration @relation(fields: [collaborationId], references: [id])
+  currency          String // "USD" | "EUR" | "GBP" | "INR" | "AED"
+  dailyLimitMinor   Int
+  monthlyLimitMinor Int
+
+  @@unique([collaborationId, currency], name: "collaborationId_currency")
+}
+
+model Payment {
+  id               String        @id @default(uuid())
+  collaborationId  String
+  collaboration    Collaboration @relation(fields: [collaborationId], references: [id])
+  amountMinor      Int
+  currency         String // "USD" | "EUR" | "GBP" | "INR" | "AED"
+  provider         String
+  providerRef      String
+  status           String        @default("PENDING") // "PENDING" | "SUCCEEDED" | "FAILED" | "REFUNDED"
+  description      String?
+  createdAt        DateTime      @default(now())
+  disputes         Dispute[]
+}
+
+model Payout {
+  id          String       @id @default(uuid())
+  accountId   String
+  account     Account      @relation(fields: [accountId], references: [id])
+  amountMinor Int
+  currency    String // "USD" | "EUR" | "GBP" | "INR" | "AED"
+  status      String       @default("REQUESTED") // "REQUESTED" | "PROCESSING" | "PAID" | "FAILED"
+  createdAt   DateTime     @default(now())
+}
+
+model Dispute {
+  id        String        @id @default(uuid())
+  paymentId String
+  payment   Payment       @relation(fields: [paymentId], references: [id])
+  reason    String
+  status    String        @default("OPEN") // "OPEN" | "UNDER_REVIEW" | "RESOLVED" | "REJECTED"
+  createdAt DateTime      @default(now())
+}
+
+
