@@ -1,0 +1,19 @@
+{
+  "name": "geektrust-metrocard",
+  "version": "1.0.0",
+  "description": "geektrust metrocard demo",
+  "main": "geektrust.js",
+  "scripts": {
+    "start": "node geektrust.js",
+    "test": "mocha"
+  },
+  "author": "saurabh.agrawal.IN@outlook.com",
+  "license": "ISC",
+  "dependencies": {
+    "mocha": "^10.0.0",
+    "sinon": "^17.0.1"
+  },
+  "devDependencies": {
+    "testdouble": "^3.20.1"
+  }
+}

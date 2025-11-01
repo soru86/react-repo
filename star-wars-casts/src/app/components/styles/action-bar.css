@@ -1,0 +1,27 @@
+.action-bar {
+  height: 80px;
+  background-color: #282a35;
+}
+
+.typography {
+  color: #ffffff;
+}
+
+.search-bar {
+  margin: 20px 20px 20px 50px;
+  height: 30px;
+  padding-right: 25px;
+  background: url('../../assets/icons/magnifier.png') no-repeat right;
+  background-size: 30px;
+  background-color: #ffffff;
+}
+
+.group-sort-by {
+  position: relative;
+  float: right;
+  margin: 20px 50px 20px 20px;
+}
+
+.select-sort-by {
+  height: 35px;
+}
