@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import Lottie from 'lottie-react';
+import SafeLottie from '../components/SafeLottie';
 import { useAuth } from '../contexts/AuthContext';
 import api, { Animation } from '../utils/api';
 import './AnimationDetail.css';
@@ -19,11 +19,38 @@ export default function AnimationDetail() {
     {
       enabled: !!id,
       onSuccess: (data) => {
-        // Fetch animation file
-        fetch(`http://localhost:5000${data.file_path}`)
-          .then((res) => res.json())
-          .then((data) => setAnimationData(data))
-          .catch((err) => console.error('Error loading animation:', err));
+        // Fetch animation file using relative path (will go through Vite proxy)
+        if (!data.file_path) {
+          console.error('Animation has no file_path');
+          setAnimationData(null);
+          return;
+        }
+        
+        fetch(data.file_path)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error(`Failed to load animation: ${res.status} ${res.statusText}`);
+            }
+            
+            const contentType = res.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              throw new Error(`Invalid content type: ${contentType}`);
+            }
+            
+            return res.json();
+          })
+          .then((jsonData) => {
+            // Validate it's a valid object
+            if (jsonData && typeof jsonData === 'object') {
+              setAnimationData(jsonData);
+            } else {
+              throw new Error('Invalid animation data structure');
+            }
+          })
+          .catch((err) => {
+            console.error('Error loading animation:', err);
+            setAnimationData(null);
+          });
       },
     }
   );
@@ -60,16 +87,17 @@ export default function AnimationDetail() {
       
       <div className="animation-detail">
         <div className="animation-detail-preview">
-          {animationData ? (
-            <Lottie
-              animationData={animationData}
-              loop={true}
-              autoplay={true}
-              style={{ width: '100%', maxHeight: '500px' }}
-            />
-          ) : (
-            <div className="loading">Loading animation preview...</div>
-          )}
+          <SafeLottie
+            animationData={animationData}
+            loop={true}
+            autoplay={true}
+            style={{ width: '100%', maxHeight: '500px' }}
+            fallback={
+              <div className="loading">
+                {animationData ? 'Invalid animation data' : 'Loading animation preview...'}
+              </div>
+            }
+          />
         </div>
 
         <div className="animation-detail-info">
@@ -127,4 +155,5 @@ export default function AnimationDetail() {
     </div>
   );
 }
+
 

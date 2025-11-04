@@ -46,7 +46,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
     const publicAnimations = await AnimationModel.findPublic();
     
     // Combine and deduplicate
-    const animationMap = new Map();
+    const animationMap = new Map<number, any>();
     animations.forEach(anim => animationMap.set(anim.id, anim));
     publicAnimations.forEach(anim => {
       if (!animationMap.has(anim.id)) {
@@ -54,7 +54,9 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
       }
     });
 
-    res.json(Array.from(animationMap.values()));
+    const result = Array.from(animationMap.values());
+    console.log(`[GET /animations] Returning ${result.length} animations for user ${userId}`);
+    res.json(result);
   } catch (error) {
     console.error('Get animations error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -111,7 +113,8 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promis
 // Search animations
 router.get('/search/:query', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const query = req.params.query;
+    // Decode the URL-encoded query parameter
+    const query = decodeURIComponent(req.params.query);
     const userId = req.user!.id;
     const animations = await AnimationModel.search(query, userId);
     res.json(animations);

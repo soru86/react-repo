@@ -105,12 +105,16 @@ export class AnimationModel {
 
   static async search(query: string, userId?: number): Promise<Animation[]> {
     const db = (await import('../db/database')).db;
-    const searchTerm = `%${query}%`;
+    // Make search case-insensitive by using LOWER() and trim whitespace
+    // Use COALESCE to handle NULL values in description and tags
+    const searchTerm = `%${query.trim().toLowerCase()}%`;
     
     if (userId) {
       return db.all<Animation>(
         `SELECT * FROM animations 
-         WHERE (title LIKE ? OR description LIKE ? OR tags LIKE ?)
+         WHERE (LOWER(title) LIKE ? 
+           OR LOWER(COALESCE(description, '')) LIKE ? 
+           OR LOWER(COALESCE(tags, '')) LIKE ?)
          AND (user_id = ? OR is_public = 1)
          ORDER BY created_at DESC`,
         [searchTerm, searchTerm, searchTerm, userId]
@@ -118,7 +122,9 @@ export class AnimationModel {
     } else {
       return db.all<Animation>(
         `SELECT * FROM animations 
-         WHERE (title LIKE ? OR description LIKE ? OR tags LIKE ?)
+         WHERE (LOWER(title) LIKE ? 
+           OR LOWER(COALESCE(description, '')) LIKE ? 
+           OR LOWER(COALESCE(tags, '')) LIKE ?)
          AND is_public = 1
          ORDER BY created_at DESC`,
         [searchTerm, searchTerm, searchTerm]

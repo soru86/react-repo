@@ -50,19 +50,19 @@ async function seed() {
     // Sample Lottie animation data (minimal valid structure)
     const sampleAnimations = [
       {
-        title: 'Loading Spinner',
+        title: 'Spinning Loader',
         description: 'A smooth rotating loading spinner animation',
-        filename: 'loading-spinner.json',
-        tags: 'loading,spinner,ui',
+        filename: 'spinning-loader.json',
+        tags: 'loading,spinner,ui,loader',
         is_public: true,
         lottieData: {
           v: '5.7.4',
           fr: 30,
           ip: 0,
-          op: 60,
+          op: 90,
           w: 100,
           h: 100,
-          nm: 'Loading Spinner',
+          nm: 'Spinning Loader',
           ddd: 0,
           assets: [],
           layers: [
@@ -70,11 +70,17 @@ async function seed() {
               ddd: 0,
               ind: 1,
               ty: 4,
-              nm: 'Circle',
+              nm: 'Spinner',
               sr: 1,
               ks: {
                 o: { a: 0, k: 100 },
-                r: { a: 1, k: [{ i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 0, s: [0] }, { t: 60, s: [360] }] },
+                r: {
+                  a: 1,
+                  k: [
+                    { i: { x: 0.333, y: 0.333 }, o: { x: 0.667, y: 0.667 }, t: 0, s: 0 },
+                    { i: { x: 0.333, y: 0.333 }, o: { x: 0.667, y: 0.667 }, t: 90, s: 360 }
+                  ]
+                },
                 p: { a: 0, k: [50, 50, 0] },
                 a: { a: 0, k: [0, 0, 0] },
                 s: { a: 0, k: [100, 100, 100] },
@@ -87,18 +93,27 @@ async function seed() {
                     {
                       d: 1,
                       ty: 'el',
-                      s: { a: 0, k: [40, 40] },
+                      s: { a: 0, k: [60, 60] },
                       p: { a: 0, k: [0, 0] },
-                      nm: 'Ellipse Path 1',
+                      nm: 'Spinner Circle',
                     },
                     {
                       ty: 'st',
-                      c: { a: 0, k: [0.2, 0.5, 1, 1] },
+                      c: {
+                        a: 1,
+                        k: [
+                          { i: { x: [0.667, 0.667, 0.667, 0.667], y: [1, 1, 1, 1] }, o: { x: [0.333, 0.333, 0.333, 0.333], y: [0, 0, 0, 0] }, t: 0, s: [0.2, 0.5, 1, 1] },
+                          { i: { x: [0.667, 0.667, 0.667, 0.667], y: [1, 1, 1, 1] }, o: { x: [0.333, 0.333, 0.333, 0.333], y: [0, 0, 0, 0] }, t: 22, s: [1, 0.2, 0.5, 1] },
+                          { i: { x: [0.667, 0.667, 0.667, 0.667], y: [1, 1, 1, 1] }, o: { x: [0.333, 0.333, 0.333, 0.333], y: [0, 0, 0, 0] }, t: 45, s: [0.5, 1, 0.2, 1] },
+                          { i: { x: [0.667, 0.667, 0.667, 0.667], y: [1, 1, 1, 1] }, o: { x: [0.333, 0.333, 0.333, 0.333], y: [0, 0, 0, 0] }, t: 67, s: [0.2, 0.5, 1, 1] },
+                          { t: 90, s: [0.2, 0.5, 1, 1] }
+                        ]
+                      },
                       o: { a: 0, k: 100 },
-                      w: { a: 0, k: 3 },
+                      w: { a: 0, k: 6 },
                       lc: 1,
                       lj: 1,
-                      nm: 'Stroke 1',
+                      nm: 'Spinner Stroke',
                     },
                     {
                       ty: 'tr',
@@ -112,14 +127,14 @@ async function seed() {
                       nm: 'Transform',
                     },
                   ],
-                  nm: 'Ellipse 1',
+                  nm: 'Spinner Group',
                   np: 2,
                   cix: 2,
                   bm: 0,
                 },
               ],
               ip: 0,
-              op: 60,
+              op: 90,
               st: 0,
               bm: 0,
             },
@@ -335,19 +350,19 @@ async function seed() {
                 p: {
                   a: 1,
                   k: [
-                    { i: { x: 0.667, y: 1 }, o: { x: 0.333, y: 0 }, t: 0, s: [50, 20] },
-                    { i: { x: 0.667, y: 1 }, o: { x: 0.333, y: 0 }, t: 30, s: [50, 170] },
-                    { i: { x: 0.667, y: 1 }, o: { x: 0.333, y: 0 }, t: 60, s: [50, 20] },
-                    { t: 90, s: [50, 20] },
+                    { i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 0, s: [50, 20, 0] },
+                    { i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 30, s: [50, 170, 0] },
+                    { i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 60, s: [50, 20, 0] },
+                    { t: 90, s: [50, 20, 0] },
                   ],
                 },
                 a: { a: 0, k: [0, 0, 0] },
                 s: {
                   a: 1,
                   k: [
-                    { i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 28, s: [100, 100] },
-                    { i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 32, s: [120, 80] },
-                    { t: 60, s: [100, 100] },
+                    { i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 28, s: [100, 100, 100] },
+                    { i: { x: [0.667], y: [1] }, o: { x: [0.333], y: [0] }, t: 32, s: [120, 80, 100] },
+                    { t: 60, s: [100, 100, 100] },
                   ],
                 },
               },
@@ -357,6 +372,7 @@ async function seed() {
                   ty: 'gr',
                   it: [
                     {
+                      d: 1,
                       ty: 'el',
                       s: { a: 0, k: [40, 40] },
                       p: { a: 0, k: [0, 0] },
@@ -369,6 +385,17 @@ async function seed() {
                       r: 1,
                       bm: 0,
                       nm: 'Fill 1',
+                    },
+                    {
+                      ty: 'tr',
+                      p: { a: 0, k: [0, 0] },
+                      a: { a: 0, k: [0, 0] },
+                      s: { a: 0, k: [100, 100] },
+                      r: { a: 0, k: 0 },
+                      o: { a: 0, k: 100 },
+                      sk: { a: 0, k: 0 },
+                      sa: { a: 0, k: 0 },
+                      nm: 'Transform',
                     },
                   ],
                   nm: 'Ball Shape',
@@ -406,8 +433,8 @@ async function seed() {
             {
               ddd: 0,
               ind: 1,
-              ty: 5,
-              nm: 'Text Layer',
+              ty: 4,
+              nm: 'Fade Shape',
               sr: 1,
               ks: {
                 o: {
@@ -423,25 +450,44 @@ async function seed() {
                 s: { a: 0, k: [100, 100, 100] },
               },
               ao: 0,
-              t: {
-                d: {
-                  k: [
+              shapes: [
+                {
+                  ty: 'gr',
+                  it: [
                     {
-                      s: {
-                        f: 'Arial',
-                        s: 24,
-                        t: 'Hello World',
-                        j: 1,
-                        tr: 0,
-                        lh: 28.8,
-                        ls: 0,
-                        fc: [0, 0, 0],
-                      },
-                      t: 0,
+                      ty: 'rc',
+                      d: 1,
+                      s: { a: 0, k: [150, 40] },
+                      p: { a: 0, k: [0, 0] },
+                      r: { a: 0, k: 5 },
+                      nm: 'Rectangle',
+                    },
+                    {
+                      ty: 'fl',
+                      c: { a: 0, k: [0.2, 0.4, 0.8, 1] },
+                      o: { a: 0, k: 100 },
+                      r: 1,
+                      bm: 0,
+                      nm: 'Fill',
+                    },
+                    {
+                      ty: 'tr',
+                      p: { a: 0, k: [0, 0] },
+                      a: { a: 0, k: [0, 0] },
+                      s: { a: 0, k: [100, 100] },
+                      r: { a: 0, k: 0 },
+                      o: { a: 0, k: 100 },
+                      sk: { a: 0, k: 0 },
+                      sa: { a: 0, k: 0 },
+                      nm: 'Transform',
                     },
                   ],
+                  nm: 'Fade Rectangle',
+                  np: 3,
+                  cix: 2,
+                  bm: 0,
                 },
-              },
+              ],
               ip: 0,
               op: 60,
               st: 0,
@@ -460,7 +506,7 @@ async function seed() {
       fs.writeFileSync(filePath, JSON.stringify(anim.lottieData, null, 2));
 
       const userId = i % 3 === 0 ? user1Id : (i % 3 === 1 ? user2Id : user3Id);
-      
+
       const fileBasename = path.basename(filePath);
       const animationId = await AnimationModel.create({
         user_id: userId,

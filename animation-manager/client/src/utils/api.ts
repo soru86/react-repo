@@ -3,6 +3,26 @@ import axios from 'axios';
 // Use relative URL to leverage Vite proxy, or use env var if set
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+// Create axios instance that uses the same baseURL as AuthContext
+// This ensures all API calls use the correct base URL
+const apiClient = axios.create({
+  baseURL: API_URL,
+});
+
+// Add request interceptor to include auth token
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export interface Animation {
   id: number;
   user_id: number;
@@ -27,23 +47,23 @@ export interface AnimationCreate {
 const api = {
   animations: {
     getAll: async (): Promise<Animation[]> => {
-      const response = await axios.get('/animations');
+      const response = await apiClient.get('/animations');
       return response.data;
     },
     getPublic: async (): Promise<Animation[]> => {
-      const response = await axios.get('/animations/public');
+      const response = await apiClient.get('/animations/public');
       return response.data;
     },
     getMyAnimations: async (): Promise<Animation[]> => {
-      const response = await axios.get('/animations/my-animations');
+      const response = await apiClient.get('/animations/my-animations');
       return response.data;
     },
     getById: async (id: number): Promise<Animation> => {
-      const response = await axios.get(`/animations/${id}`);
+      const response = await apiClient.get(`/animations/${id}`);
       return response.data;
     },
     search: async (query: string): Promise<Animation[]> => {
-      const response = await axios.get(`/animations/search/${encodeURIComponent(query)}`);
+      const response = await apiClient.get(`/animations/search/${encodeURIComponent(query)}`);
       return response.data;
     },
     create: async (data: AnimationCreate, file: File): Promise<Animation> => {
@@ -54,7 +74,7 @@ const api = {
       if (data.tags) formData.append('tags', data.tags);
       formData.append('is_public', String(data.is_public || false));
 
-      const response = await axios.post('/animations', formData, {
+      const response = await apiClient.post('/animations', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -62,11 +82,11 @@ const api = {
       return response.data;
     },
     update: async (id: number, data: Partial<AnimationCreate>): Promise<Animation> => {
-      const response = await axios.put(`/animations/${id}`, data);
+      const response = await apiClient.put(`/animations/${id}`, data);
       return response.data;
     },
     delete: async (id: number): Promise<void> => {
-      await axios.delete(`/animations/${id}`);
+      await apiClient.delete(`/animations/${id}`);
     },
   },
 };
