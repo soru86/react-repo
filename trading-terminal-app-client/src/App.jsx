@@ -18,6 +18,7 @@ import Signup from './pages/Signup';
 import NotFound from './pages/NotFound';
 import { orderBook, portfolioData, positions, recentOrders, watchlist } from './data/app-data';
 import ProtectedRoute from './hocs/ProtectedRoute';
+import { BACKEND_BASE_URL } from './shared/config/api';
 
 // Function to get default symbol based on market
 const getDefaultSymbol = (market) => {
@@ -65,12 +66,69 @@ const App = () => {
     }
   }, [currentMarket, selectedSymbol]);
 
-  const handlePlaceOrder = (side) => {
+  const handlePlaceOrder = async (side) => {
     if (paperTrading) {
-      console.log('Disable Paper Trading mode to place real orders.');
+      // Paper trading is handled by PaperTrading component
       return;
     }
-    console.log('Placing order:', { side, symbol: selectedSymbol, type: orderType, quantity, price });
+
+    if (!quantity || quantity <= 0) {
+      alert('Please enter a valid quantity');
+      return;
+    }
+
+    const orderPrice = orderType === 'LIMIT' ? parseFloat(price) : null;
+    if (orderType === 'LIMIT' && (!price || price <= 0)) {
+      alert('Please enter a valid price for limit orders');
+      return;
+    }
+
+    // Determine endpoint based on market
+    const isIndian = currentMarket === 'indian';
+    const endpoint = isIndian 
+      ? `${BACKEND_BASE_URL}/indian-market/placeorder`
+      : `${BACKEND_BASE_URL}/crypto-market/binance/order`;
+
+    const orderData = isIndian ? {
+      symbol: selectedSymbol,
+      quantity: parseInt(quantity),
+      orderType: orderType,
+      side: side,
+      price: orderPrice,
+      exchange: 'NSE',
+      segment: 'EQUITY',
+      productType: 'INTRADAY'
+    } : {
+      symbol: selectedSymbol,
+      side: side,
+      orderType: orderType,
+      quantity: parseFloat(quantity),
+      price: orderPrice
+    };
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${side} order placed successfully${result.broker ? ` through ${result.broker}` : ''}!`);
+        // Clear form
+        setQuantity('');
+        setPrice('');
+      } else {
+        alert(`Order placement failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Order placement error:', error);
+      alert('Order placement failed. Please try again.');
+    }
   };
 
   return (

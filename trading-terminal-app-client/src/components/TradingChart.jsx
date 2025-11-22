@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart } from "lightweight-charts";
 import { BACKEND_BASE_URL } from '../shared/config/api';
 import { intervalMap } from '../data/constants';
@@ -17,475 +17,419 @@ const getDefaultSymbol = (context) => {
     return 'BTCUSDT';
 };
 
-const chartOptions = (chartContainerRef, actualHeight) => {
-    return {
-        layout: {
-            background: { color: '#1e293b' },
-            textColor: '#94a3b8',
-        },
-        grid: {
-            vertLines: { color: '#334155' },
-            horzLines: { color: '#334155' },
-        },
-        width: chartContainerRef?.current?.clientWidth,
-        height: actualHeight,
-        timeScale: {
-            timeVisible: true,
-            secondsVisible: false,
-        },
-        rightPriceScale: {
-            visible: true,
-            borderVisible: false,
-            scaleMargins: {
-                top: 0.1,
-                bottom: 0.2,
-            },
-        },
+// Convert API data to lightweight-charts format
+const transformData = (data) => {
+    if (!Array.isArray(data)) return [];
+    
+    return data.map(item => ({
+        time: typeof item.time === 'string' 
+            ? (new Date(item.time).getTime() / 1000) 
+            : (typeof item.time === 'number' && item.time > 10000000000 
+                ? Math.floor(item.time / 1000) 
+                : item.time),
+        open: parseFloat(item.open) || 0,
+        high: parseFloat(item.high) || 0,
+        low: parseFloat(item.low) || 0,
+        close: parseFloat(item.close) || 0,
+        volume: parseFloat(item.volume) || 0,
+    })).filter(item => item.time && item.open && item.high && item.low && item.close);
+};
+
+// Convert volume data for histogram
+const transformVolumeData = (data) => {
+    if (!Array.isArray(data)) return [];
+    
+    return data.map(item => ({
+        time: typeof item.time === 'string' 
+            ? (new Date(item.time).getTime() / 1000) 
+            : (typeof item.time === 'number' && item.time > 10000000000 
+                ? Math.floor(item.time / 1000) 
+                : item.time),
+        value: parseFloat(item.volume) || 0,
+        color: parseFloat(item.close) >= parseFloat(item.open) ? '#10b981' : '#ef4444',
+    })).filter(item => item.time && item.value);
+};
+
+// Simple moving average
+const calculateSMA = (data, period = 14) => {
+    if (!data || data.length < period) return [];
+    let sma = [];
+    for (let i = 0; i < data.length; i++) {
+        if (i < period - 1) {
+            sma.push({ time: data[i].time, value: null });
+        } else {
+            let sum = 0;
+            for (let j = 0; j < period; j++) {
+                sum += data[i - j].close;
+            }
+            sma.push({ time: data[i].time, value: sum / period });
+        }
     }
+    return sma;
 };
 
-const getApiEndpoint = (symbol, interval) => {
+// Exponential moving average
+const calculateEMA = (data, period = 14) => {
+    if (!data || data.length < period) return [];
+    let ema = [];
+    let k = 2 / (period + 1);
+    let prev;
+    for (let i = 0; i < data.length; i++) {
+        if (i < period - 1) {
+            ema.push({ time: data[i].time, value: null });
+        } else if (i === period - 1) {
+            let sum = 0;
+            for (let j = 0; j < period; j++) {
+                sum += data[i - j].close;
+            }
+            prev = sum / period;
+            ema.push({ time: data[i].time, value: prev });
+        } else {
+            prev = data[i].close * k + prev * (1 - k);
+            ema.push({ time: data[i].time, value: prev });
+        }
+    }
+    return ema;
+};
+
+const getApiEndpoint = (symbol, interval, marketContext) => {
     const apiInterval = intervalMap[interval] || interval;
-    return `${BACKEND_BASE_URL}/indian-market/test-real-time-chart?symbol=${symbol}&interval=${apiInterval}`;
+    
+    if (marketContext === 'indian' || marketContext?.includes('indian')) {
+        return `${BACKEND_BASE_URL}/indian-market?symbol=${symbol}&interval=${apiInterval}`;
+    } else if (marketContext === 'crypto' || marketContext?.includes('crypto')) {
+        return `${BACKEND_BASE_URL}/crypto-market/binance/data?symbol=${symbol}&interval=${apiInterval}&start=30 days ago UTC`;
+    } else if (marketContext === 'forex' || marketContext?.includes('forex')) {
+        return `${BACKEND_BASE_URL}/forex-market/data?symbol=${symbol}&interval=${apiInterval}`;
+    }
+    return `${BACKEND_BASE_URL}/indian-market?symbol=${symbol}&interval=${apiInterval}`;
 };
 
-const cleanupChart = (chartRef, isDestroyedRef, chartId) => {
+const cleanupChart = (chartRef, isDestroyedRef) => {
     if (chartRef.current && !isDestroyedRef.current) {
-        console.log(`TradingChart [${chartId}] cleaning up chart`);
         isDestroyedRef.current = true;
         try {
             chartRef.current.remove();
         } catch (e) {
-            console.warn(`TradingChart [${chartId}] error during chart cleanup:`, e);
+            console.warn('Error during chart cleanup:', e);
         }
         chartRef.current = null;
     }
 };
 
-/*
-const initialRecords = [
-    {
-        "time": 1558963,
-        "open": 9539.98,
-        "high": 8419.35,
-        "low": 660.97,
-        "close": 1796.64,
-        "volume": 897336.79,
-        "stock_symbol": "GOOGL",
-        "exchange": "LSE",
-        "sector": "Finance",
-        "currency": "BRL"
-    },
-    {
-        "time": 11224417,
-        "open": 2571.52,
-        "high": 6995.02,
-        "low": 2823.9,
-        "close": 779.12,
-        "volume": 956963.34,
-        "stock_symbol": "AAPL",
-        "exchange": "NASDAQ",
-        "sector": "Technology",
-        "currency": "EUR"
-    },
-    {
-        "time": 15680886,
-        "open": 8927.11,
-        "high": 2522.81,
-        "low": 853.87,
-        "close": 4128.65,
-        "volume": 289904.88,
-        "stock_symbol": "MSFT",
-        "exchange": "LSE",
-        "sector": "Finance",
-        "currency": "CNY"
-    },
-    {
-        "time": 15704381,
-        "open": 6475.14,
-        "high": 9010.36,
-        "low": 3709.98,
-        "close": 3677.88,
-        "volume": 544879.07,
-        "stock_symbol": "GOOGL",
-        "exchange": "NYSE",
-        "sector": "Finance",
-        "currency": "CNY"
-    },
-    {
-        "time": 17645916,
-        "open": 1995.64,
-        "high": 6512.51,
-        "low": 8174.5,
-        "close": 6061.2,
-        "volume": 824611.91,
-        "stock_symbol": "GOOGL",
-        "exchange": "NYSE",
-        "sector": "Technology",
-        "currency": "COP"
-    },
-    {
-        "time": 20450553,
-        "open": 1651.63,
-        "high": 3280.93,
-        "low": 6090.13,
-        "close": 6352.01,
-        "volume": 934913.56,
-        "stock_symbol": "AMZN",
-        "exchange": "NYSE",
-        "sector": "Energy",
-        "currency": "EUR"
-    },
-    {
-        "time": 22171227,
-        "open": 3735.69,
-        "high": 6185.69,
-        "low": 4739.11,
-        "close": 5611.51,
-        "volume": 249310.08,
-        "stock_symbol": "AMZN",
-        "exchange": "NYSE",
-        "sector": "Finance",
-        "currency": "USD"
-    },
-    {
-        "time": 22671142,
-        "open": 799.22,
-        "high": 6239.1,
-        "low": 1185.12,
-        "close": 5168.41,
-        "volume": 288987.64,
-        "stock_symbol": "MSFT",
-        "exchange": "NYSE",
-        "sector": "Finance",
-        "currency": "CNY"
-    },
-    {
-        "time": 23428481,
-        "open": 6065.83,
-        "high": 3464.02,
-        "low": 8256.29,
-        "close": 7330.28,
-        "volume": 32425.79,
-        "stock_symbol": "AAPL",
-        "exchange": "NASDAQ",
-        "sector": "Healthcare",
-        "currency": "EUR"
-    },
-    {
-        "time": 24303271,
-        "open": 1903.97,
-        "high": 359.96,
-        "low": 8243.34,
-        "close": 5313.65,
-        "volume": 110302.9,
-        "stock_symbol": "AMZN",
-        "exchange": "NYSE",
-        "sector": "Healthcare",
-        "currency": "IDR"
-    },
-    {
-        "time": 27134626,
-        "open": 1055.37,
-        "high": 4808.8,
-        "low": 5296.93,
-        "close": 2125.28,
-        "volume": 436487.86,
-        "stock_symbol": "GOOGL",
-        "exchange": "LSE",
-        "sector": "Technology",
-        "currency": "CNY"
-    },
-    {
-        "time": 27826887,
-        "open": 917.02,
-        "high": 5040.22,
-        "low": 18.04,
-        "close": 8953.98,
-        "volume": 133452.27,
-        "stock_symbol": "AAPL",
-        "exchange": "TSX",
-        "sector": "Healthcare",
-        "currency": "JPY"
-    },
-    {
-        "time": 28666348,
-        "open": 4234.62,
-        "high": 6480.12,
-        "low": 6656.84,
-        "close": 6273.76,
-        "volume": 67175.24,
-        "stock_symbol": "GOOGL",
-        "exchange": "LSE",
-        "sector": "Energy",
-        "currency": "CNY"
-    },
-    {
-        "time": 29422769,
-        "open": 763.21,
-        "high": 9706.11,
-        "low": 7826.73,
-        "close": 8085.7,
-        "volume": 733827.44,
-        "stock_symbol": "AMZN",
-        "exchange": "TSX",
-        "sector": "Healthcare",
-        "currency": "RUB"
-    },
-    {
-        "time": 30671354,
-        "open": 9526.05,
-        "high": 6853.0,
-        "low": 8596.01,
-        "close": 4291.26,
-        "volume": 416742.92,
-        "stock_symbol": "GOOGL",
-        "exchange": "LSE",
-        "sector": "Finance",
-        "currency": "SYP"
-    },
-    {
-        "time": 31961647,
-        "open": 4194.97,
-        "high": 4300.12,
-        "low": 6776.91,
-        "close": 2627.17,
-        "volume": 983879.37,
-        "stock_symbol": "AMZN",
-        "exchange": "NASDAQ",
-        "sector": "Finance",
-        "currency": "EUR"
-    },
-    {
-        "time": 47837697,
-        "open": 1863.64,
-        "high": 149.23,
-        "low": 6050.83,
-        "close": 5252.11,
-        "volume": 45743.1,
-        "stock_symbol": "AMZN",
-        "exchange": "LSE",
-        "sector": "Finance",
-        "currency": "EUR"
-    },
-    {
-        "time": 49967408,
-        "open": 7970.13,
-        "high": 6614.89,
-        "low": 5940.47,
-        "close": 5585.0,
-        "volume": 631692.13,
-        "stock_symbol": "MSFT",
-        "exchange": "NASDAQ",
-        "sector": "Technology",
-        "currency": "SOS"
-    },
-    {
-        "time": 50822444,
-        "open": 5122.99,
-        "high": 2802.24,
-        "low": 8305.73,
-        "close": 3919.69,
-        "volume": 105906.98,
-        "stock_symbol": "MSFT",
-        "exchange": "TSX",
-        "sector": "Technology",
-        "currency": "USD"
-    },
-    {
-        "time": 53508466,
-        "open": 7770.38,
-        "high": 9533.43,
-        "low": 8093.14,
-        "close": 3670.65,
-        "volume": 53970.33,
-        "stock_symbol": "GOOGL",
-        "exchange": "NASDAQ",
-        "sector": "Energy",
-        "currency": "ETB"
-    },
-    {
-        "time": 54527333,
-        "open": 7789.17,
-        "high": 3695.36,
-        "low": 7943.87,
-        "close": 6573.94,
-        "volume": 745840.6,
-        "stock_symbol": "GOOGL",
-        "exchange": "NASDAQ",
-        "sector": "Finance",
-        "currency": "ANG"
-    },
-    {
-        "time": 59194536,
-        "open": 1611.41,
-        "high": 5490.85,
-        "low": 3222.5,
-        "close": 2618.97,
-        "volume": 307718.17,
-        "stock_symbol": "MSFT",
-        "exchange": "NYSE",
-        "sector": "Healthcare",
-        "currency": "CNY"
-    },
-    {
-        "time": 61660941,
-        "open": 2459.84,
-        "high": 7239.6,
-        "low": 6136.67,
-        "close": 8333.1,
-        "volume": 893220.75,
-        "stock_symbol": "AAPL",
-        "exchange": "TSX",
-        "sector": "Finance",
-        "currency": "MXN"
-    },
-    {
-        "time": 63134639,
-        "open": 7359.82,
-        "high": 4301.69,
-        "low": 2999.57,
-        "close": 6120.48,
-        "volume": 867103.41,
-        "stock_symbol": "GOOGL",
-        "exchange": "LSE",
-        "sector": "Healthcare",
-        "currency": "NOK"
-    },
-    {
-        "time": 66487178,
-        "open": 7516.82,
-        "high": 1463.81,
-        "low": 1545.05,
-        "close": 7411.28,
-        "volume": 379097.72,
-        "stock_symbol": "MSFT",
-        "exchange": "NYSE",
-        "sector": "Energy",
-        "currency": "CNY"
-    },
-    {
-        "time": 69315173,
-        "open": 3282.53,
-        "high": 3399.7,
-        "low": 927.29,
-        "close": 7782.32,
-        "volume": 824508.62,
-        "stock_symbol": "AMZN",
-        "exchange": "NYSE",
-        "sector": "Energy",
-        "currency": "MYR"
-    },
-    {
-        "time": 70190557,
-        "open": 6619.63,
-        "high": 8895.92,
-        "low": 2449.23,
-        "close": 2850.57,
-        "volume": 462787.74,
-        "stock_symbol": "AAPL",
-        "exchange": "NASDAQ",
-        "sector": "Healthcare",
-        "currency": "CNY"
-    }
-]; */
-
 const TradingChart = ({
     height = 400,
     selectedSymbol = null,
-    // indicator = 'none',
+    indicator = 'none',
     selectedInterval = '1h',
     marketContext = null
 }) => {
-    const [symbol] = useState(selectedSymbol || getDefaultSymbol(marketContext));
+    const symbol = selectedSymbol || getDefaultSymbol(marketContext);
     const [records, setRecords] = useState([]);
+    const [volumeData, setVolumeData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [chartId] = useState(() => Math.random().toString(36).substr(2, 9));
     const chartContainerRef = useRef();
     const isDestroyedRef = useRef(false);
     const chart = useRef();
-    const series = useRef();
+    const candlestickSeries = useRef();
+    const volumeSeries = useRef();
+    const indicatorSeriesRef = useRef(null);
     const { socket } = useSocketContext();
 
-    useEffect(() => {
-        try {
-            const container = chartContainerRef.current;
-            const isDestroyed = isDestroyedRef.current;
-            const cId = chartId.current
-
-            if (socket) {
-                socket.on('new_record', (record) => {
-                    // Append each incoming record
-                    console.log('new_record received: ', record);
-                    setRecords(() => [...records, record]);
-                });
-            }
-
-            chart.current = createChart(chartContainerRef?.current, chartOptions);
-            series.current = chart.current.addCandlestickSeries({
-                upColor: '#10b981',
-                downColor: '#ef4444',
-                borderVisible: false,
-                wickUpColor: '#10b981',
-                wickDownColor: '#ef4444',
-                priceFormat: {
-                    type: 'price',
-                    precision: 5,
-                    minMove: 0.00001,
-                },
-            });
-
-            series.current.setData(records);
-
-            // Cleanup on unmount
-            return () => {
-                socket?.off('new_record');
-                cleanupChart(container, isDestroyed, cId);
-            };
-        } catch (error) {
-            setError(error.message || 'Failed to load chart data');
+    // Fetch chart data
+    const fetchChartData = useCallback(async () => {
+        if (!symbol) {
+            setError('No symbol selected');
+            setLoading(false);
+            return;
         }
-    }, [socket]);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            await fetch(getApiEndpoint(symbol, selectedInterval), {
-                mode: 'cors'
-            });
-        };
-        fetchData();
-    }, [symbol, selectedInterval])
-
-    useEffect(() => {
         try {
-            if (!symbol) {
-                setError('No symbol selected');
-                setLoading(false);
-                return;
-            }
-
             setLoading(true);
             setError(null);
 
-            // console.log("chartContainerRef: ", chartContainerRef);
-            // console.log("chartContainerRef: ", chartContainerRef.current);
+            const endpoint = getApiEndpoint(symbol, selectedInterval, marketContext);
+            const response = await fetch(endpoint, {
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-            series.current.update(records[records.length - 1]);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch data: ${response.status}`);
+            }
 
-            chart.current.timeScale().fitContent();
-            chart.current.timeScale().scrollToPosition(5);
-        } catch (error) {
-            setError(error.message || 'Failed to load chart data');
+            const data = await response.json();
+            
+            // Handle different response formats
+            const chartData = Array.isArray(data) ? data : (data.data || data.candles || []);
+            
+            const transformed = transformData(chartData);
+            const transformedVolume = transformVolumeData(chartData);
+
+            if (transformed.length === 0) {
+                throw new Error('No data available for this symbol');
+            }
+
+            // Sort by time
+            transformed.sort((a, b) => a.time - b.time);
+            transformedVolume.sort((a, b) => a.time - b.time);
+
+            setRecords(transformed);
+            setVolumeData(transformedVolume);
+
+            // Update chart if it exists
+            if (candlestickSeries.current && transformed.length > 0) {
+                candlestickSeries.current.setData(transformed);
+            }
+            if (volumeSeries.current && transformedVolume.length > 0) {
+                volumeSeries.current.setData(transformedVolume);
+            }
+            if (chart.current) {
+                chart.current.timeScale().fitContent();
+            }
+
+            setLoading(false);
+        } catch (err) {
+            console.error('Error fetching chart data:', err);
+            setError(err.message || 'Failed to load chart data');
             setLoading(false);
         }
-    }, [symbol, chartId, records]);
+    }, [symbol, selectedInterval, marketContext]);
+
+    // Handle resize
+    const handleResize = useCallback(() => {
+        if (chartContainerRef?.current && chart?.current && !isDestroyedRef?.current) {
+            const newHeight = typeof height === 'string' && height.includes('%')
+                ? chartContainerRef?.current?.clientHeight
+                : (typeof height === 'number' ? height : 400);
+
+            chart.current.applyOptions({
+                width: chartContainerRef?.current?.clientWidth,
+                height: newHeight,
+            });
+        }
+    }, [height]);
+
+    // Initialize chart
+    useEffect(() => {
+        if (!symbol || !chartContainerRef?.current) {
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+        isDestroyedRef.current = false;
+
+        // Calculate actual height
+        const actualHeight = typeof height === 'string' && height.includes('%')
+            ? chartContainerRef?.current?.clientHeight
+            : (typeof height === 'number' ? height : 400);
+
+        // Create chart
+        chart.current = createChart(chartContainerRef.current, {
+            layout: {
+                background: { color: '#1e293b' },
+                textColor: '#94a3b8',
+            },
+            grid: {
+                vertLines: { color: '#334155' },
+                horzLines: { color: '#334155' },
+            },
+            width: chartContainerRef.current.clientWidth,
+            height: actualHeight,
+            timeScale: {
+                timeVisible: true,
+                secondsVisible: false,
+                borderColor: '#334155',
+            },
+            rightPriceScale: {
+                visible: true,
+                borderVisible: false,
+                scaleMargins: {
+                    top: 0.1,
+                    bottom: 0.2,
+                },
+            },
+        });
+
+        // Add candlestick series
+        candlestickSeries.current = chart.current.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+            priceFormat: {
+                type: 'price',
+                precision: 2,
+                minMove: 0.01,
+            },
+        });
+
+        candlestickSeries.current.priceScale().applyOptions({
+            scaleMargins: {
+                top: 0.1,
+                bottom: 0.15,
+            },
+        });
+
+        // Add volume series
+        volumeSeries.current = chart.current.addHistogramSeries({
+            color: '#3b82f6',
+            priceFormat: {
+                type: 'volume',
+            },
+            priceScaleId: '',
+            scaleMargins: {
+                top: 0.9,
+                bottom: 0,
+            },
+            baseLineVisible: false,
+        });
+
+        volumeSeries.current.priceScale().applyOptions({
+            scaleMargins: {
+                top: 0.9,
+                bottom: 0,
+            },
+        });
+
+        // Handle resize
+        window.addEventListener('resize', handleResize);
+        const resizeObserver = new ResizeObserver(() => {
+            handleResize();
+        });
+
+        if (chartContainerRef.current) {
+            resizeObserver.observe(chartContainerRef.current);
+        }
+
+        // Fetch initial data
+        fetchChartData();
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            resizeObserver.disconnect();
+            cleanupChart(chart, isDestroyedRef);
+        };
+    }, [symbol, height, handleResize, fetchChartData]);
+
+    // Handle WebSocket real-time updates
+    useEffect(() => {
+        if (!socket || !candlestickSeries.current) return;
+
+        const handleNewRecord = (record) => {
+            try {
+                const transformed = transformData([record]);
+                if (transformed.length > 0) {
+                    const newCandle = transformed[0];
+                    
+                    // Update candlestick
+                    candlestickSeries.current.update(newCandle);
+                    
+                    // Update volume
+                    const volumeItem = {
+                        time: newCandle.time,
+                        value: newCandle.volume,
+                        color: newCandle.close >= newCandle.open ? '#10b981' : '#ef4444',
+                    };
+                    volumeSeries.current?.update(volumeItem);
+                    
+                    // Update records state
+                    setRecords(prev => {
+                        const updated = [...prev];
+                        const lastIndex = updated.length - 1;
+                        if (lastIndex >= 0 && updated[lastIndex].time === newCandle.time) {
+                            updated[lastIndex] = newCandle;
+                        } else {
+                            updated.push(newCandle);
+                        }
+                        return updated;
+                    });
+                }
+            } catch (err) {
+                console.error('Error processing new record:', err);
+            }
+        };
+
+        socket.on('new_record', handleNewRecord);
+
+        return () => {
+            socket.off('new_record', handleNewRecord);
+        };
+    }, [socket, candlestickSeries, volumeSeries]);
+
+    // Update chart data when records change
+    useEffect(() => {
+        if (candlestickSeries.current && records.length > 0) {
+            candlestickSeries.current.setData(records);
+        }
+        if (volumeSeries.current && volumeData.length > 0) {
+            volumeSeries.current.setData(volumeData);
+        }
+        if (chart.current && records.length > 0) {
+            chart.current.timeScale().fitContent();
+        }
+    }, [records, volumeData]);
+
+    // Handle indicators
+    useEffect(() => {
+        if (!chart.current || !candlestickSeries.current || records.length === 0) return;
+
+        // Remove previous indicator
+        if (indicatorSeriesRef.current) {
+            try {
+                chart.current.removeSeries(indicatorSeriesRef.current);
+            } catch (e) {
+                console.warn('Error removing indicator series:', e);
+            }
+            indicatorSeriesRef.current = null;
+        }
+
+        // Add new indicator
+        if (indicator === 'sma' && records.length >= 14) {
+            const sma = calculateSMA(records, 14).filter(d => d.value !== null);
+            if (sma.length > 0) {
+                indicatorSeriesRef.current = chart.current.addLineSeries({
+                    color: '#fbbf24',
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    title: 'SMA (14)',
+                    priceScaleId: 'right',
+                });
+                indicatorSeriesRef.current.setData(sma);
+            }
+        } else if (indicator === 'ema' && records.length >= 14) {
+            const ema = calculateEMA(records, 14).filter(d => d.value !== null);
+            if (ema.length > 0) {
+                indicatorSeriesRef.current = chart.current.addLineSeries({
+                    color: '#3b82f6',
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    title: 'EMA (14)',
+                    priceScaleId: 'right',
+                });
+                indicatorSeriesRef.current.setData(ema);
+            }
+        }
+    }, [indicator, records]);
+
+    // Refetch data when symbol or interval changes
+    useEffect(() => {
+        if (chart.current && candlestickSeries.current) {
+            fetchChartData();
+        }
+    }, [symbol, selectedInterval, fetchChartData]);
 
     if (error) {
         return (
             <div style={{
                 width: '100%',
-                height: '400px',
+                height: typeof height === 'string' && height.includes('%') ? height : `${height}px`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -493,43 +437,62 @@ const TradingChart = ({
                 background: 'rgba(239, 68, 68, 0.1)',
                 borderRadius: '8px',
                 border: '1px solid rgba(239, 68, 68, 0.2)',
-                minHeight: '300px'
+                minHeight: '300px',
+                flexDirection: 'column',
+                gap: '8px',
             }}>
-                <div>
-                    <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Chart Error</div>
-                    <div style={{ fontSize: '14px', opacity: 0.8 }}>{error}</div>
-                </div>
+                <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Chart Error</div>
+                <div style={{ fontSize: '14px', opacity: 0.8 }}>{error}</div>
+                <button
+                    onClick={fetchChartData}
+                    style={{
+                        marginTop: '12px',
+                        padding: '8px 16px',
+                        background: '#3b82f6',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                    }}
+                >
+                    Retry
+                </button>
             </div>
         );
     }
 
-    if (loading) {
-        <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            color: '#94a3b8',
-            fontSize: '16px',
-            fontWeight: '500'
-        }}>
-            Loading chart...
-        </div>
+    if (loading && records.length === 0) {
+        return (
+            <div style={{
+                width: '100%',
+                height: typeof height === 'string' && height.includes('%') ? height : `${height}px`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                background: '#1e293b',
+                borderRadius: '8px',
+                minHeight: '300px',
+            }}>
+                <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading chart...</div>
+            </div>
+        );
     }
 
     return (
         <div
             style={{
                 width: '100%',
-                height: `${height}px`,
+                height: typeof height === 'string' && height.includes('%') ? height : `${height}px`,
                 position: 'relative',
                 background: '#1e293b',
                 borderRadius: '8px',
-                minHeight: '200px'
+                minHeight: '200px',
             }}
             ref={chartContainerRef}
         />
     );
 };
 
-export default TradingChart
+export default TradingChart;

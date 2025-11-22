@@ -1,0 +1,70 @@
+{
+    "name": "rtl-react-select-demo",
+    "version": "1.0.0",
+    "description": "React form with react-select, styled-components, and reCAPTCHA v3",
+    "main": "index.js",
+    "scripts": {
+        "test": "jest --coverage",
+        "test:watch": "jest --watch",
+        "start": "react-scripts start",
+        "build": "react-scripts build"
+    },
+    "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-select": "^5.8.0",
+        "styled-components": "^6.1.0",
+        "react-google-recaptcha-v3": "^1.10.1"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.23.0",
+        "@babel/preset-env": "^7.23.0",
+        "@babel/preset-react": "^7.23.0",
+        "@testing-library/react": "^14.1.2",
+        "@testing-library/jest-dom": "^6.1.5",
+        "@testing-library/user-event": "^14.5.1",
+        "babel-jest": "^29.7.0",
+        "identity-obj-proxy": "^3.0.0",
+        "jest": "^29.7.0",
+        "jest-environment-jsdom": "^29.7.0",
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "react-scripts": "^5.0.1",
+        "tailwindcss": "^3.4.0",
+        "autoprefixer": "^10.4.16",
+        "postcss": "^8.4.32"
+    },
+    "jest": {
+        "testEnvironment": "jsdom",
+        "setupFilesAfterEnv": [
+            "<rootDir>/src/setupTests.js"
+        ],
+        "moduleNameMapper": {
+            "^.+\\.(css|less|scss|sass)$": "identity-obj-proxy",
+            "^styled-components$": "<rootDir>/node_modules/styled-components/dist/styled-components.browser.cjs.js"
+        },
+        "transform": {
+            "^.+\\.(js|jsx)$": "babel-jest"
+        },
+        "collectCoverageFrom": [
+            "src/**/*.{js,jsx}",
+            "!src/index.js",
+            "!src/setupTests.js"
+        ],
+        "transformIgnorePatterns": [
+            "node_modules/(?!(react-select|styled-components|react-google-recaptcha-v3)/)"
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    }
+}

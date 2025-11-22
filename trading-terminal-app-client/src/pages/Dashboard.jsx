@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, ArrowUp, ArrowDown, DollarSign, Clock, Edit2, User, LogIn, LogOut, Shield, BarChart3 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { TrendingUp, TrendingDown, ArrowUp, ArrowDown, DollarSign, Clock, Edit2, User, LogIn, LogOut, Shield, BarChart3, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import PropTypes from 'prop-types';
 import { useTheme } from '../shared/context/ThemeContext';
@@ -19,70 +19,24 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
     error: null,
     lastUpdated: null
   });
+  const [watchlist, setWatchlist] = useState([
+    { symbol: 'RELIANCE', name: 'Reliance Industries', price: 2850.75, change: 2.5 },
+    { symbol: 'TCS', name: 'Tata Consultancy Services', price: 3750.25, change: 1.8 },
+    { symbol: 'HDFCBANK', name: 'HDFC Bank', price: 1650.50, change: 1.2 },
+    { symbol: 'INFY', name: 'Infosys', price: 1550.00, change: 0.9 },
+    { symbol: 'ICICIBANK', name: 'ICICI Bank', price: 950.75, change: 0.7 }
+  ]);
+  const [isEditingWatchlist, setIsEditingWatchlist] = useState(false);
+  const [newSymbol, setNewSymbol] = useState('');
 
   // Determine if we're on Indian market page
   const isIndianMarketPage = location.pathname.startsWith('/indian');
   const isIndianTradingPage = location.pathname.startsWith('/indian/trading');
 
-  // Call fetchMarketData on mount only if on Indian market page
-  useEffect(() => {
-    if (isIndianMarketPage) {
-      fetchMarketData();
-    }
-  }, [isIndianMarketPage]);
-
-  // Add market data refresh interval and retry only if on Indian market page
-  useEffect(() => {
-    if (!isIndianMarketPage) return;
-
-    const fetchWithRetry = async (retries = 3) => {
-      try {
-        await fetchMarketData();
-      } catch (err) {
-        console.error("Error fetching with retry.", err);
-        if (retries > 0) {
-          setTimeout(() => fetchWithRetry(retries - 1), 2000);
-        }
-      }
-    };
-
-    fetchWithRetry();
-
-    // Refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchWithRetry();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [isIndianMarketPage]);
-
-  /* const checkDhanAuthStatus = async () => {
-    try {
-      const response = await fetch(`${endpoints['dhanStatus']}`);
-      const data = await response.json();
-      
-      if (data.isLoggedIn) {
-        setDhanAuth({
-          isLoggedIn: true,
-          userProfile: data.profile,
-          accessToken: data.accessToken,
-          loading: false,
-          error: null
-        });
-        
-        localStorage.setItem('dhan_access_token', data.accessToken);
-        localStorage.setItem('dhan_user_profile', JSON.stringify(data.profile));
-      }
-    } catch (error) {
-      console.error('Dhan auth status check failed:', error);
-    }
-  }; */
-
-  // Fetch market data from broker APIs
-  const fetchMarketData = async () => {
+  // Memoize fetchMarketData to avoid infinite loops
+  const fetchMarketData = useCallback(async () => {
     // Only fetch data if we're on Indian market page
     if (!isIndianMarketPage) {
-      console.log('Not on Indian market page, skipping data fetch');
       return;
     }
 
@@ -94,7 +48,6 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
 
       if (!response.ok) {
         // If broker data is not available, use mock data
-        console.log('Broker data not available, using mock data');
         setMarketData({
           gainers: [
             { symbol: 'RELIANCE', close: 2850.75, change_percent: 2.5, totvol: 1500000 },
@@ -132,7 +85,6 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
         throw new Error('No data available from brokers');
       }
     } catch (error) {
-      console.error('Failed to fetch market data:', error);
       // Use mock data as fallback
       setMarketData({
         gainers: [
@@ -154,24 +106,23 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
         lastUpdated: new Date()
       });
     }
-  };
+  }, [isIndianMarketPage, endpoints]);
 
-  // Call fetchMarketData on mount only if on Indian trading page
+  // Call fetchMarketData on mount only if on Indian market page
   useEffect(() => {
-    if (isIndianTradingPage) {
+    if (isIndianMarketPage) {
       fetchMarketData();
     }
-  }, [isIndianTradingPage, fetchMarketData]);
+  }, [isIndianMarketPage, fetchMarketData]);
 
-  // Add market data refresh interval and retry only if on Indian trading page
+  // Add market data refresh interval and retry only if on Indian market page
   useEffect(() => {
-    if (!isIndianTradingPage) return;
+    if (!isIndianMarketPage) return;
 
     const fetchWithRetry = async (retries = 3) => {
       try {
         await fetchMarketData();
       } catch (err) {
-        console.error("Error fetching with retry.", err);
         if (retries > 0) {
           setTimeout(() => fetchWithRetry(retries - 1), 2000);
         }
@@ -186,29 +137,8 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [isIndianTradingPage]);
+  }, [isIndianMarketPage, fetchMarketData]);
 
-  /* const checkDhanAuthStatus = async () => {
-    try {
-      const response = await fetch(`${endpoints['dhanStatus']}`);
-      const data = await response.json();
-      
-      if (data.isLoggedIn) {
-        setDhanAuth({
-          isLoggedIn: true,
-          userProfile: data.profile,
-          accessToken: data.accessToken,
-          loading: false,
-          error: null
-        });
-        
-        localStorage.setItem('dhan_access_token', data.accessToken);
-        localStorage.setItem('dhan_user_profile', JSON.stringify(data.profile));
-      }
-    } catch (error) {
-      console.error('Dhan auth status check failed:', error);
-    }
-  }; */
 
   // Manual refresh function
   const handleRefreshMarketData = () => {
@@ -265,15 +195,6 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
   const trendingShares = formattedGainers.slice(0, 5);
 
 
-  // Mock watchlist data if none provided
-  const defaultWatchlist = [
-    { symbol: 'RELIANCE', name: 'Reliance Industries', price: 2850.75, change: 2.5 },
-    { symbol: 'TCS', name: 'Tata Consultancy Services', price: 3750.25, change: 1.8 },
-    { symbol: 'HDFCBANK', name: 'HDFC Bank', price: 1650.50, change: 1.2 },
-    { symbol: 'INFY', name: 'Infosys', price: 1550.00, change: 0.9 },
-    { symbol: 'ICICIBANK', name: 'ICICI Bank', price: 950.75, change: 0.7 }
-  ];
-
   // Mock recent orders if none provided
   const defaultRecentOrders = [
     { id: 1, symbol: 'RELIANCE', type: 'BUY', quantity: 10, price: 2850.75, time: '10:30 AM' },
@@ -282,7 +203,6 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
   ];
 
   // Use provided data or defaults
-  const displayWatchlist = defaultWatchlist; // Watchlist is not directly used in this component's render, but kept for potential future use or if it were passed as a prop.
   const displayRecentOrders = recentOrders.length > 0 ? recentOrders : defaultRecentOrders;
 
   // Mock data for index charts with more variation
@@ -375,8 +295,23 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
   };
 
   const handleEditWatchlist = () => {
-    // TODO: Implement watchlist editing functionality
-    console.log('Edit watchlist clicked');
+    setIsEditingWatchlist(!isEditingWatchlist);
+  };
+
+  const handleAddToWatchlist = () => {
+    if (newSymbol.trim() && !watchlist.find(w => w.symbol === newSymbol.toUpperCase())) {
+      setWatchlist([...watchlist, {
+        symbol: newSymbol.toUpperCase(),
+        name: newSymbol.toUpperCase(),
+        price: 0,
+        change: 0
+      }]);
+      setNewSymbol('');
+    }
+  };
+
+  const handleRemoveFromWatchlist = (symbol) => {
+    setWatchlist(watchlist.filter(w => w.symbol !== symbol));
   };
 
   return (
@@ -795,31 +730,104 @@ const Dashboard = ({ portfolioData, recentOrders, positions }) => {
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {displayWatchlist.map((stock) => (
-              <div key={stock.symbol} style={{
+            {isEditingWatchlist && (
+              <div style={{
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                gap: '4px',
+                marginBottom: '8px',
                 padding: '6px',
                 background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '6px',
-                fontSize: '12px'
+                borderRadius: '6px'
               }}>
-                <div>
-                  <div style={{ color: '#ffffff', fontWeight: '500' }}>{stock.symbol}</div>
-                  <div style={{ color: '#94a3b8', fontSize: '11px' }}>{stock.name}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: '#ffffff' }}>₹{stock.price.toLocaleString()}</div>
-                  <div style={{
-                    color: stock.change >= 0 ? '#10b981' : '#ef4444',
-                    fontSize: '11px'
-                  }}>
-                    {stock.change >= 0 ? '+' : ''}{stock.change}%
+                <input
+                  type="text"
+                  value={newSymbol}
+                  onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddToWatchlist();
+                    }
+                  }}
+                  placeholder="Add symbol"
+                  style={{
+                    flex: 1,
+                    padding: '4px 8px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  onClick={handleAddToWatchlist}
+                  style={{
+                    padding: '4px 12px',
+                    background: '#3b82f6',
+                    border: 'none',
+                    borderRadius: '4px',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            )}
+            {watchlist.length === 0 ? (
+              <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', padding: '12px' }}>
+                No symbols in watchlist. {isEditingWatchlist && 'Add symbols above.'}
+              </div>
+            ) : (
+              watchlist.map((stock) => (
+                <div key={stock.symbol} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '6px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  fontSize: '12px'
+                }}>
+                  <div>
+                    <div style={{ color: '#ffffff', fontWeight: '500' }}>{stock.symbol}</div>
+                    <div style={{ color: '#94a3b8', fontSize: '11px' }}>{stock.name}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ color: '#ffffff' }}>₹{stock.price.toLocaleString()}</div>
+                      <div style={{
+                        color: stock.change >= 0 ? '#10b981' : '#ef4444',
+                        fontSize: '11px'
+                      }}>
+                        {stock.change >= 0 ? '+' : ''}{stock.change}%
+                      </div>
+                    </div>
+                    {isEditingWatchlist && (
+                      <button
+                        onClick={() => handleRemoveFromWatchlist(stock.symbol)}
+                        style={{
+                          padding: '2px 6px',
+                          background: 'rgba(239, 68, 68, 0.2)',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

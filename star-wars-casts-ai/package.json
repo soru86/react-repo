@@ -1,0 +1,60 @@
+{
+    "name": "star-wars-casts-ai",
+    "version": "1.0.0",
+    "description": "Star Wars Characters App with react-virtualized",
+    "private": true,
+    "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-virtualized": "^9.22.5",
+        "react-scripts": "5.0.1"
+    },
+    "devDependencies": {
+        "@testing-library/react": "^14.1.2",
+        "@testing-library/jest-dom": "^6.1.5",
+        "@testing-library/user-event": "^14.5.1",
+        "jest": "^29.7.0",
+        "@types/react": "^18.2.43",
+        "@types/react-dom": "^18.2.17",
+        "@types/react-virtualized": "^9.21.25"
+    },
+    "scripts": {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "NODE_OPTIONS=--no-deprecation react-scripts test --coverage --watchAll=false",
+        "eject": "react-scripts eject"
+    },
+    "eslintConfig": {
+        "extends": [
+            "react-app"
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    },
+    "jest": {
+        "collectCoverageFrom": [
+            "src/**/*.{js,jsx}",
+            "!src/index.js",
+            "!src/reportWebVitals.js",
+            "!src/setupTests.js"
+        ],
+        "coverageThreshold": {
+            "global": {
+                "branches": 90,
+                "functions": 100,clear
+                "lines": 99,
+                "statements": 99
+            }
+        }
+    }
+}

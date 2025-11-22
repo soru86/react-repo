@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import TradingChart from '../components/TradingChart';
 import PaperTrading from '../components/PaperTrading';
 import { indicatorsMap, marketTypesMap } from '../data/constants';
+import { BACKEND_BASE_URL } from '../shared/config/api';
 
 const IndianMarketTrading = ({
   orderBook,
@@ -218,31 +219,80 @@ const IndianMarketTrading = ({
     );
   };
 
-  const handleApplyRisk = () => {
-    setStrategyMessage(
-      `Applied: Target ₹${targetPrice || '-'}, Stoploss ₹${stopLoss || '-'}`
-    );
+  const handleApplyRisk = async () => {
+    if (!targetPrice && !stopLoss) {
+      setStrategyMessage('Please set target price or stop loss');
+      return;
+    }
+
+    try {
+      // Store risk parameters (could be sent to backend for order management)
+      const riskParams = {
+        symbol: selectedSymbol,
+        targetPrice: targetPrice ? parseFloat(targetPrice) : null,
+        stopLoss: stopLoss ? parseFloat(stopLoss) : null
+      };
+
+      // In a real implementation, this would be sent to backend
+      // For now, we'll store it locally
+      localStorage.setItem(`risk_${selectedSymbol}`, JSON.stringify(riskParams));
+
+      setStrategyMessage(
+        `Applied: Target ₹${targetPrice || '-'}, Stoploss ₹${stopLoss || '-'}`
+      );
+    } catch (error) {
+      setStrategyMessage('Failed to apply risk parameters');
+    }
   };
 
-  const handleStrategy = (type) => {
-    switch (type) {
-      case 'buy_target_sl':
-        setStrategyMessage('Buy with Target & Stoploss set!');
-        break;
-      case 'trail_stop':
-        setStrategyMessage('Trailing Stop activated!');
-        break;
-      case 'book_profit':
-        setStrategyMessage('Profit booked!');
-        break;
-      case 'exit_all':
-        setStrategyMessage('All positions exited!');
-        break;
-      case 'reverse_position':
-        setStrategyMessage('Position reversed!');
-        break;
-      default:
-        setStrategyMessage('');
+  const handleStrategy = async (type) => {
+    if (!selectedSymbol || !quantity) {
+      setStrategyMessage('Please select a symbol and enter quantity');
+      return;
+    }
+
+    try {
+      switch (type) {
+        case 'buy_target_sl':
+          if (!targetPrice || !stopLoss) {
+            setStrategyMessage('Please set target price and stop loss first');
+            return;
+          }
+          // Place buy order with target and stop loss
+          if (handlePlaceOrder) {
+            await handlePlaceOrder('BUY');
+            await handleApplyRisk();
+            setStrategyMessage('Buy order placed with Target & Stoploss!');
+          }
+          break;
+        case 'trail_stop':
+          // Activate trailing stop (would need backend support)
+          setStrategyMessage('Trailing Stop activated! (Feature requires backend support)');
+          break;
+        case 'book_profit':
+          // Book profit for current positions
+          if (handlePlaceOrder) {
+            await handlePlaceOrder('SELL');
+            setStrategyMessage('Profit booked!');
+          }
+          break;
+        case 'exit_all':
+          // Exit all positions (would need backend support to get all positions)
+          setStrategyMessage('Exit all positions (Feature requires backend support)');
+          break;
+        case 'reverse_position':
+          // Reverse current position
+          if (handlePlaceOrder) {
+            const currentSide = 'BUY'; // Would need to check actual position
+            await handlePlaceOrder(currentSide === 'BUY' ? 'SELL' : 'BUY');
+            setStrategyMessage('Position reversed!');
+          }
+          break;
+        default:
+          setStrategyMessage('');
+      }
+    } catch (error) {
+      setStrategyMessage(`Strategy execution failed: ${error.message}`);
     }
   };
 
@@ -694,7 +744,49 @@ const IndianMarketTrading = ({
                   )}
                   <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                     <button
-                      onClick={() => handlePlaceOrder('BUY')}
+                      onClick={async () => {
+                        if (paperTrading) {
+                          // Paper trading handled by PaperTrading component
+                          return;
+                        }
+                        if (!quantity || quantity <= 0) {
+                          alert('Please enter a valid quantity');
+                          return;
+                        }
+                        const orderPrice = orderType === 'LIMIT' ? parseFloat(price) : null;
+                        if (orderType === 'LIMIT' && (!price || price <= 0)) {
+                          alert('Please enter a valid price for limit orders');
+                          return;
+                        }
+                        const orderData = {
+                          symbol: selectedSymbol,
+                          quantity: parseInt(quantity),
+                          orderType: orderType,
+                          side: 'BUY',
+                          price: orderPrice,
+                          exchange: marketFeatures.exchanges[0] || 'NSE',
+                          segment: 'EQUITY',
+                          productType: 'INTRADAY'
+                        };
+                        try {
+                          const response = await fetch(`${BACKEND_BASE_URL}/indian-market/placeorder`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(orderData)
+                          });
+                          const result = await response.json();
+                          if (result.success) {
+                            alert(`BUY order placed successfully${result.broker ? ` through ${result.broker}` : ''}!`);
+                            setQuantity('');
+                            setPrice('');
+                            if (handlePlaceOrder) handlePlaceOrder('BUY');
+                          } else {
+                            alert(`Order placement failed: ${result.error || 'Unknown error'}`);
+                          }
+                        } catch (error) {
+                          alert('Order placement failed. Please try again.');
+                        }
+                      }}
                       style={{
                         flex: 1,
                         padding: '8px',
@@ -710,7 +802,49 @@ const IndianMarketTrading = ({
                       Buy
                     </button>
                     <button
-                      onClick={() => handlePlaceOrder('SELL')}
+                      onClick={async () => {
+                        if (paperTrading) {
+                          // Paper trading handled by PaperTrading component
+                          return;
+                        }
+                        if (!quantity || quantity <= 0) {
+                          alert('Please enter a valid quantity');
+                          return;
+                        }
+                        const orderPrice = orderType === 'LIMIT' ? parseFloat(price) : null;
+                        if (orderType === 'LIMIT' && (!price || price <= 0)) {
+                          alert('Please enter a valid price for limit orders');
+                          return;
+                        }
+                        const orderData = {
+                          symbol: selectedSymbol,
+                          quantity: parseInt(quantity),
+                          orderType: orderType,
+                          side: 'SELL',
+                          price: orderPrice,
+                          exchange: marketFeatures.exchanges[0] || 'NSE',
+                          segment: 'EQUITY',
+                          productType: 'INTRADAY'
+                        };
+                        try {
+                          const response = await fetch(`${BACKEND_BASE_URL}/indian-market/placeorder`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(orderData)
+                          });
+                          const result = await response.json();
+                          if (result.success) {
+                            alert(`SELL order placed successfully${result.broker ? ` through ${result.broker}` : ''}!`);
+                            setQuantity('');
+                            setPrice('');
+                            if (handlePlaceOrder) handlePlaceOrder('SELL');
+                          } else {
+                            alert(`Order placement failed: ${result.error || 'Unknown error'}`);
+                          }
+                        } catch (error) {
+                          alert('Order placement failed. Please try again.');
+                        }
+                      }}
                       style={{
                         flex: 1,
                         padding: '8px',

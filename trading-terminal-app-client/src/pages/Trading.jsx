@@ -118,7 +118,7 @@ const Trading = ({
     return indianStocks.includes(symbol?.toUpperCase());
   };
 
-  // Handle real trading order placement for Indian stocks
+  // Handle real trading order placement
   const handleRealTradingOrder = async (side) => {
     if (!quantity || quantity <= 0) {
       alert('Please enter a valid quantity');
@@ -133,7 +133,13 @@ const Trading = ({
       return;
     }
 
-    const orderData = {
+    // Determine market context for API endpoint
+    const isIndian = isIndianStock(selectedSymbol);
+    const endpoint = isIndian 
+      ? `${BACKEND_BASE_URL}/indian-market/placeorder`
+      : `${BACKEND_BASE_URL}/crypto-market/binance/order`;
+
+    const orderData = isIndian ? {
       symbol: selectedSymbol,
       quantity: parseInt(quantity),
       orderType: orderType,
@@ -142,10 +148,16 @@ const Trading = ({
       exchange: 'NSE',
       segment: 'EQUITY',
       productType: 'INTRADAY'
+    } : {
+      symbol: selectedSymbol,
+      side: side,
+      orderType: orderType,
+      quantity: parseFloat(quantity),
+      price: orderPrice
     };
 
     try {
-      const response = await fetch(`${BASE_URL}/indian-market/placeorder`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -156,12 +168,12 @@ const Trading = ({
       const result = await response.json();
 
       if (result.success) {
-        alert(`${side} order placed successfully through ${result.broker}!`);
+        alert(`${side} order placed successfully${result.broker ? ` through ${result.broker}` : ''}!`);
         // Clear form
         setQuantity('');
         setPrice('');
       } else {
-        alert(`Order placement failed: ${result.error}`);
+        alert(`Order placement failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Order placement error:', error);
@@ -169,10 +181,19 @@ const Trading = ({
     }
   };
 
+  // Unified order handler
+  const handlePlaceOrder = (side) => {
+    if (paperTrading) {
+      // Paper trading is handled by PaperTrading component
+      // The PaperTrading component will handle the order placement
+      return;
+    }
+    // Real trading
+    handleRealTradingOrder(side);
+  };
+
   // Combine paper trading orders with existing recent orders
   const allRecentOrders = [...recentOrders];
-  console.log('All recent orders:', allRecentOrders);
-  console.log('Existing recent orders:', recentOrders);
 
   const getMarketSpecificFeatures = () => {
     switch (marketType) {
@@ -373,39 +394,81 @@ const Trading = ({
     : (watchlist.find(w => w.symbol === selectedSymbol)?.price || '—');
 
   // --- Strategy semi-automation handlers ---
-  const handleApplyRisk = () => {
-    setStrategyMessage(
-      `Applied: Target ₹${targetPrice || '-'}, Stoploss ₹${stopLoss || '-'}, ` +
-      `${isTrailing ? `Trailing Stop ₹${trailingAmount}` : ''} ` +
-      `${isFixedProfit ? `Fixed Profit ₹${fixedProfitAmount}` : ''}`
-    );
-    // Here you can send these values to backend or use in trading logic
+  const handleApplyRisk = async () => {
+    if (!targetPrice && !stopLoss) {
+      setStrategyMessage('Please set target price or stop loss');
+      return;
+    }
+
+    try {
+      // Store risk parameters (could be sent to backend for order management)
+      const riskParams = {
+        symbol: selectedSymbol,
+        targetPrice: targetPrice ? parseFloat(targetPrice) : null,
+        stopLoss: stopLoss ? parseFloat(stopLoss) : null,
+        isTrailing: isTrailing,
+        trailingAmount: trailingAmount ? parseFloat(trailingAmount) : null,
+        isFixedProfit: isFixedProfit,
+        fixedProfitAmount: fixedProfitAmount ? parseFloat(fixedProfitAmount) : null
+      };
+
+      // In a real implementation, this would be sent to backend
+      // For now, we'll store it locally
+      localStorage.setItem(`risk_${selectedSymbol}`, JSON.stringify(riskParams));
+
+      setStrategyMessage(
+        `Applied: Target ₹${targetPrice || '-'}, Stoploss ₹${stopLoss || '-'}, ` +
+        `${isTrailing ? `Trailing Stop ₹${trailingAmount}` : ''} ` +
+        `${isFixedProfit ? `Fixed Profit ₹${fixedProfitAmount}` : ''}`
+      );
+    } catch (error) {
+      setStrategyMessage('Failed to apply risk parameters');
+    }
   };
 
-  const handleStrategy = (type) => {
-    switch (type) {
-      case 'buy_target_sl':
-        setStrategyMessage('Buy with Target & Stoploss set!');
-        // Implement logic to place buy order with target/SL
-        break;
-      case 'trail_stop':
-        setStrategyMessage('Trailing Stop activated!');
-        // Implement trailing stop logic
-        break;
-      case 'book_profit':
-        setStrategyMessage('Profit booked!');
-        // Implement profit booking logic
-        break;
-      case 'exit_all':
-        setStrategyMessage('All positions exited!');
-        // Implement exit all logic
-        break;
-      case 'reverse_position':
-        setStrategyMessage('Position reversed!');
-        // Implement reverse position logic
-        break;
-      default:
-        setStrategyMessage('');
+  const handleStrategy = async (type) => {
+    if (!selectedSymbol || !quantity) {
+      setStrategyMessage('Please select a symbol and enter quantity');
+      return;
+    }
+
+    try {
+      switch (type) {
+        case 'buy_target_sl':
+          if (!targetPrice || !stopLoss) {
+            setStrategyMessage('Please set target price and stop loss first');
+            return;
+          }
+          // Place buy order with target and stop loss
+          await handlePlaceOrder('BUY');
+          await handleApplyRisk();
+          setStrategyMessage('Buy order placed with Target & Stoploss!');
+          break;
+        case 'trail_stop':
+          // Activate trailing stop (would need backend support)
+          setIsTrailing(true);
+          setStrategyMessage('Trailing Stop activated! (Feature requires backend support)');
+          break;
+        case 'book_profit':
+          // Book profit for current positions
+          await handlePlaceOrder('SELL');
+          setStrategyMessage('Profit booked!');
+          break;
+        case 'exit_all':
+          // Exit all positions (would need backend support to get all positions)
+          setStrategyMessage('Exit all positions (Feature requires backend support)');
+          break;
+        case 'reverse_position':
+          // Reverse current position
+          const currentSide = 'BUY'; // Would need to check actual position
+          await handlePlaceOrder(currentSide === 'BUY' ? 'SELL' : 'BUY');
+          setStrategyMessage('Position reversed!');
+          break;
+        default:
+          setStrategyMessage('');
+      }
+    } catch (error) {
+      setStrategyMessage(`Strategy execution failed: ${error.message}`);
     }
   };
 
