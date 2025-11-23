@@ -201,3 +201,4 @@ class StockDataGenerator {
 // Export singleton instance
 export default new StockDataGenerator();
 
+
